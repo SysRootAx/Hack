@@ -1,0 +1,322 @@
+-- ==================================================
+-- 🏹 HUB DE LANÇAMENTO DE LANÇA
+-- Lança a lança com força para cair em ~5 studs
+-- LocalScript em StarterPlayerScripts
+-- ==================================================
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+
+-- ===================== CONFIGURAÇÕES =====================
+
+local DISTANCIA_ALVO = 5                          -- studs que a lança deve percorrer horizontalmente
+local GRAVIDADE = workspace.Gravity               -- usa a gravidade atual do workspace (padrão: 196.2)
+local ANGULO_LANCAMENTO = math.rad(45)            -- ângulo de 45° para alcance máximo
+local COOLDOWN = 2                                -- segundos entre lançamentos
+
+-- Calcula a velocidade inicial necessária para alcançar DISTANCIA_ALVO studs
+-- Fórmula balística: d = v² * sin(2θ) / g  →  v = sqrt(d * g / sin(2θ))
+local velocidadeInicial = math.sqrt(DISTANCIA_ALVO * GRAVIDADE / math.sin(2 * ANGULO_LANCAMENTO))
+
+-- ===================== CRIAÇÃO DO HUB (GUI) =====================
+
+-- Remove hub antigo se existir (evita duplicatas ao reiniciar)
+if player.PlayerGui:FindFirstChild("LancaHub") then
+    player.PlayerGui:FindFirstChild("LancaHub"):Destroy()
+end
+
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "LancaHub"
+screenGui.ResetOnSpawn = false
+screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+screenGui.Parent = player.PlayerGui
+
+-- Frame principal do Hub
+local frame = Instance.new("Frame")
+frame.Name = "HubFrame"
+frame.Size = UDim2.new(0, 240, 0, 145)
+frame.Position = UDim2.new(0.5, -120, 0.85, -72)
+frame.BackgroundColor3 = Color3.fromRGB(15, 15, 25)
+frame.BorderSizePixel = 0
+frame.Parent = screenGui
+
+-- Cantos arredondados do frame
+local frameCorner = Instance.new("UICorner")
+frameCorner.CornerRadius = UDim.new(0, 14)
+frameCorner.Parent = frame
+
+-- Borda laranja brilhante
+local frameStroke = Instance.new("UIStroke")
+frameStroke.Color = Color3.fromRGB(255, 110, 0)
+frameStroke.Thickness = 2.5
+frameStroke.Parent = frame
+
+-- Sombra (via Frame extra atrás)
+local sombra = Instance.new("Frame")
+sombra.Size = UDim2.new(1, 6, 1, 6)
+sombra.Position = UDim2.new(0, -3, 0, 4)
+sombra.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+sombra.BackgroundTransparency = 0.6
+sombra.BorderSizePixel = 0
+sombra.ZIndex = frame.ZIndex - 1
+sombra.Parent = frame
+
+local sombraCorner = Instance.new("UICorner")
+sombraCorner.CornerRadius = UDim.new(0, 14)
+sombraCorner.Parent = sombra
+
+-- Barra de título
+local titulo = Instance.new("TextLabel")
+titulo.Name = "Titulo"
+titulo.Size = UDim2.new(1, 0, 0, 38)
+titulo.Position = UDim2.new(0, 0, 0, 0)
+titulo.BackgroundColor3 = Color3.fromRGB(255, 100, 0)
+titulo.BorderSizePixel = 0
+titulo.Text = "🏹  Hub de Lança"
+titulo.TextColor3 = Color3.fromRGB(255, 255, 255)
+titulo.TextScaled = true
+titulo.Font = Enum.Font.GothamBold
+titulo.ZIndex = 2
+titulo.Parent = frame
+
+local tituloCorner = Instance.new("UICorner")
+tituloCorner.CornerRadius = UDim.new(0, 14)
+tituloCorner.Parent = titulo
+
+-- Cobre os cantos inferiores arredondados do título (ficam quadrados embaixo)
+local tituloFix = Instance.new("Frame")
+tituloFix.Size = UDim2.new(1, 0, 0, 14)
+tituloFix.Position = UDim2.new(0, 0, 1, -14)
+tituloFix.BackgroundColor3 = Color3.fromRGB(255, 100, 0)
+tituloFix.BorderSizePixel = 0
+tituloFix.ZIndex = 2
+tituloFix.Parent = titulo
+
+-- Label de informação de alcance
+local infoLabel = Instance.new("TextLabel")
+infoLabel.Name = "InfoLabel"
+infoLabel.Size = UDim2.new(1, -14, 0, 22)
+infoLabel.Position = UDim2.new(0, 7, 0, 45)
+infoLabel.BackgroundTransparency = 1
+infoLabel.Text = "📏 Alcance: " .. DISTANCIA_ALVO .. " studs  |  ⚙️ CD: " .. COOLDOWN .. "s"
+infoLabel.TextColor3 = Color3.fromRGB(210, 210, 210)
+infoLabel.TextScaled = true
+infoLabel.Font = Enum.Font.Gotham
+infoLabel.ZIndex = 2
+infoLabel.Parent = frame
+
+-- Label de status
+local statusLabel = Instance.new("TextLabel")
+statusLabel.Name = "StatusLabel"
+statusLabel.Size = UDim2.new(1, -14, 0, 18)
+statusLabel.Position = UDim2.new(0, 7, 0, 70)
+statusLabel.BackgroundTransparency = 1
+statusLabel.Text = "✅ Pronto para lançar!"
+statusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
+statusLabel.TextScaled = true
+statusLabel.Font = Enum.Font.GothamMedium
+statusLabel.ZIndex = 2
+statusLabel.Parent = frame
+
+-- Botão "LANÇAR"
+local botao = Instance.new("TextButton")
+botao.Name = "BotaoLancar"
+botao.Size = UDim2.new(0, 200, 0, 42)
+botao.Position = UDim2.new(0.5, -100, 0, 96)
+botao.BackgroundColor3 = Color3.fromRGB(255, 85, 0)
+botao.BorderSizePixel = 0
+botao.Text = "⚡  LANÇAR"
+botao.TextColor3 = Color3.fromRGB(255, 255, 255)
+botao.TextScaled = true
+botao.Font = Enum.Font.GothamBold
+botao.AutoButtonColor = false
+botao.ZIndex = 2
+botao.Parent = frame
+
+local botaoCorner = Instance.new("UICorner")
+botaoCorner.CornerRadius = UDim.new(0, 10)
+botaoCorner.Parent = botao
+
+local botaoStroke = Instance.new("UIStroke")
+botaoStroke.Color = Color3.fromRGB(255, 180, 80)
+botaoStroke.Thickness = 1.5
+botaoStroke.Parent = botao
+
+-- ===================== EFEITOS VISUAIS DO BOTÃO =====================
+
+botao.MouseEnter:Connect(function()
+    botao.BackgroundColor3 = Color3.fromRGB(255, 140, 0)
+end)
+
+botao.MouseLeave:Connect(function()
+    if botao.Text == "⚡  LANÇAR" then
+        botao.BackgroundColor3 = Color3.fromRGB(255, 85, 0)
+    end
+end)
+
+-- ===================== FUNÇÃO: CRIAR LANÇA =====================
+
+local function criarLanca()
+    -- Garante referências atualizadas após respawn
+    character = player.Character or player.CharacterAdded:Wait()
+    humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+
+    local lanca = Instance.new("Part")
+    lanca.Name = "LancaProjetil"
+    lanca.Size = Vector3.new(0.35, 0.35, 3.2)      -- comprimento e espessura da lança
+    lanca.Shape = Enum.PartType.Cylinder
+    lanca.BrickColor = BrickColor.new("Bright orange")
+    lanca.Material = Enum.Material.Metal
+    lanca.Reflectance = 0.3
+    lanca.CastShadow = true
+    lanca.Anchored = false
+    lanca.CanCollide = true
+    lanca.CollisionGroup = "Default"
+
+    -- Posiciona na frente do personagem, levemente acima
+    lanca.CFrame = humanoidRootPart.CFrame
+        * CFrame.new(0, 1.2, -2.5)
+        * CFrame.Angles(0, math.pi / 2, math.pi / 2)
+
+    lanca.Parent = workspace
+
+    -- Ponta da lança (cone visual)
+    local ponta = Instance.new("SpecialMesh")
+    ponta.MeshType = Enum.MeshType.FileMesh
+    ponta.MeshId = "rbxasset://fonts/rightarm.mesh" -- placeholder; pode substituir por mesh real
+    ponta.Parent = lanca
+
+    return lanca
+end
+
+-- ===================== FUNÇÃO: LANÇAR LANÇA =====================
+
+local podelancar = true
+local heartbeatConexao = nil
+
+local function lancarLanca()
+    if not podelancar then return end
+    podelancar = false
+
+    -- Atualiza UI para cooldown
+    botao.Text = "⏳  Aguarde..."
+    botao.BackgroundColor3 = Color3.fromRGB(90, 45, 0)
+    statusLabel.Text = "🕐 Cooldown ativo..."
+    statusLabel.TextColor3 = Color3.fromRGB(255, 180, 50)
+
+    -- Cria e posiciona a lança
+    local lanca = criarLanca()
+
+    -- Calcula vetor de velocidade com ângulo balístico
+    local lookDir = humanoidRootPart.CFrame.LookVector
+    local velHoriz = velocidadeInicial * math.cos(ANGULO_LANCAMENTO)
+    local velVert  = velocidadeInicial * math.sin(ANGULO_LANCAMENTO)
+
+    local velocidadeVetor = Vector3.new(
+        lookDir.X * velHoriz,
+        velVert,
+        lookDir.Z * velHoriz
+    )
+
+    -- Aplica impulso via BodyVelocity
+    local bodyVel = Instance.new("BodyVelocity")
+    bodyVel.MaxForce = Vector3.new(1e6, 1e6, 1e6)
+    bodyVel.Velocity = velocidadeVetor
+    bodyVel.Parent = lanca
+
+    -- Remove o BodyVelocity após um breve instante (física natural toma conta)
+    task.delay(0.08, function()
+        if bodyVel and bodyVel.Parent then
+            bodyVel:Destroy()
+        end
+    end)
+
+    -- Desconecta heartbeat anterior se existir
+    if heartbeatConexao then
+        heartbeatConexao:Disconnect()
+        heartbeatConexao = nil
+    end
+
+    -- Aponta a lança na direção do vetor de velocidade em tempo real
+    heartbeatConexao = RunService.Heartbeat:Connect(function()
+        if lanca and lanca.Parent then
+            local vel = lanca.AssemblyLinearVelocity
+            if vel.Magnitude > 0.5 then
+                local ok, _ = pcall(function()
+                    lanca.CFrame = CFrame.lookAt(lanca.Position, lanca.Position + vel)
+                        * CFrame.Angles(0, math.pi / 2, math.pi / 2)
+                end)
+                if not ok then
+                    heartbeatConexao:Disconnect()
+                    heartbeatConexao = nil
+                end
+            end
+        else
+            -- Lança destruída ou removida
+            if heartbeatConexao then
+                heartbeatConexao:Disconnect()
+                heartbeatConexao = nil
+            end
+        end
+    end)
+
+    -- Destrói a lança automaticamente após 6 segundos
+    task.delay(6, function()
+        if heartbeatConexao then
+            heartbeatConexao:Disconnect()
+            heartbeatConexao = nil
+        end
+        if lanca and lanca.Parent then
+            lanca:Destroy()
+        end
+    end)
+
+    -- Cooldown: conta regressiva no status
+    local tempoRestante = COOLDOWN
+    task.spawn(function()
+        while tempoRestante > 0 do
+            statusLabel.Text = "🕐 Cooldown: " .. tempoRestante .. "s"
+            task.wait(1)
+            tempoRestante -= 1
+        end
+    end)
+
+    -- Reativa o botão após o cooldown
+    task.delay(COOLDOWN, function()
+        podelancar = true
+        botao.Text = "⚡  LANÇAR"
+        botao.BackgroundColor3 = Color3.fromRGB(255, 85, 0)
+        statusLabel.Text = "✅ Pronto para lançar!"
+        statusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
+    end)
+end
+
+-- ===================== EVENTO DO BOTÃO =====================
+
+botao.MouseButton1Click:Connect(function()
+    lancarLanca()
+end)
+
+-- ===================== RESPAWN: ATUALIZA REFERÊNCIAS =====================
+
+player.CharacterAdded:Connect(function(newChar)
+    character = newChar
+    humanoidRootPart = newChar:WaitForChild("HumanoidRootPart")
+    -- Reseta o estado ao respawnar
+    podelancar = true
+    botao.Text = "⚡  LANÇAR"
+    botao.BackgroundColor3 = Color3.fromRGB(255, 85, 0)
+    statusLabel.Text = "✅ Pronto para lançar!"
+    statusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
+end)
+
+-- ===================== LOG =====================
+
+print(string.format(
+    "[LancaHub] ✅ Carregado! | Alcance: %d studs | Ângulo: 45° | Velocidade inicial: %.2f studs/s | Cooldown: %ds",
+    DISTANCIA_ALVO, velocidadeInicial, COOLDOWN
+))
